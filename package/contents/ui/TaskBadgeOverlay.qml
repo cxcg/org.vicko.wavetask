@@ -16,6 +16,12 @@ Item {
     readonly property bool shiftBadgeDown: (Plasmoid.pluginName === "org.vicko.wavetask") && task.audioStreamIcon !== null
     readonly property int badgeMaskY: shiftBadgeDown ? root.height - badgeRect.height : 0
     readonly property int offset: Math.round(Math.max(Kirigami.Units.smallSpacing / 2, badgeMask.width / 32))
+    // The small font is likely to not be small enough here for very space-constrained
+    // panels; allow going this much under it.
+    readonly property real smallestFractionOfSmallFontSize: 0.75
+    // If the actual height is less, scale the font down. If it's greater, scale it up.
+    readonly property int iconSizeForDefaultFontSize: Kirigami.Units.iconSizes.large
+    readonly property real badgeScaleFactor: Math.max(smallestFractionOfSmallFontSize, icon.height / iconSizeForDefaultFontSize)
 
     Item {
         id: badgeMask
@@ -87,7 +93,9 @@ Item {
         }
 
         visible: task.smartLauncherItem.countVisible
-        padding: 1
+        padding: Math.floor(root.badgeScaleFactor * 2)
+
+        font.pointSize: Math.floor((Kirigami.Theme.smallFont.pointSize * root.badgeScaleFactor))
 
         text: task.smartLauncherItem.count > 9999
         ? i18nc("Over 9999 new messages, overlay, keep short", "9,999+")
