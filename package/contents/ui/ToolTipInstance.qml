@@ -127,7 +127,8 @@ ColumnLayout {
                 // window title
                 PlasmaComponents3.Label {
                     id: winTitle
-                    maximumLineCount: 1
+                    maximumLineCount: 2
+                    wrapMode: Text.Wrap
                     Layout.fillWidth: true
                     elide: Text.ElideRight
                     property bool somethingVisible: (thumbnailSourceItem.visible ||
@@ -144,6 +145,7 @@ ColumnLayout {
                 PlasmaComponents3.Label {
                     id: subtext
                     maximumLineCount: 2
+                    wrapMode: Text.Wrap
                     Layout.fillWidth: true
                     elide: Text.ElideRight
                     text: toolTipDelegate.isWin ? root.generateSubText() : ""
