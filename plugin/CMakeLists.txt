@@ -19,6 +19,8 @@ find_package(KF6 REQUIRED COMPONENTS
     Notifications
     KIO
     Bookmarks
+    GlobalAccel   # Para KF6::GlobalAccel
+    XmlGui        # Para KF6::XmlGui
 )
 
 # Workspace libs
@@ -95,6 +97,8 @@ target_link_libraries(wavetask
         KF6::ConfigCore
         KF6::ConfigWidgets
         KF6::Notifications
+        KF6::GlobalAccel
+        KF6::XmlGui
         KF6::KIOCore KF6::KIOGui KF6::KIOFileWidgets KF6::Bookmarks
         Plasma::Plasma Plasma::Activities Plasma::ActivitiesStats
         PW::LibTaskManager PW::LibNotificationManager

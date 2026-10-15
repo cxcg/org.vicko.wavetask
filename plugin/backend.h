@@ -1,17 +1,17 @@
 /*
-    SPDX-FileCopyrightText: 2013-2016 Eike Hein <hein@kde.org>
-
-    SPDX-License-Identifier: GPL-2.0-or-later
-*/
+ *    SPDX-FileCopyrightText: 2013-2016 Eike Hein <hein@kde.org>
+ *
+ *    SPDX-License-Identifier: GPL-2.0-or-later
+ */
 
 #pragma once
 
 #include <KConfigWatcher>
 
-#include <QHash>
+#include <QAction>
 #include <QObject>
+#include <QQuickItem>
 #include <QRect>
-#include <QSet>
 
 #include <netwm.h>
 #include <qqmlregistration.h>
@@ -19,28 +19,21 @@
 
 #include "kactivitymanagerd_plugins_settings.h"
 
-class QAction;
+class KActionCollection;
 class QActionGroup;
-class QFileSystemWatcher;
 class QQuickItem;
 class QQuickWindow;
 class QJsonArray;
-class QSocketNotifier;
-class QTimer;
-class QWindow;
 
 namespace KActivities
 {
-class Consumer;
+    class Consumer;
 }
 
-namespace WaveTask
-{
 class Backend : public QObject
 {
     Q_OBJECT
     QML_ELEMENT
-    Q_CLASSINFO("D-Bus Interface", "org.kde.plasmashell.WavetaskMeta")
 
 public:
     enum MiddleClickAction {
@@ -54,7 +47,9 @@ public:
 
     Q_ENUM(MiddleClickAction)
 
-    Q_PROPERTY(bool metaKeyHeld READ isMetaKeyHeld NOTIFY metaKeyHeldChanged)
+    Q_PROPERTY(int screen READ screen WRITE setScreen NOTIFY screenChanged)
+    Q_PROPERTY(bool hasActiveTask READ hasActiveTask WRITE setHasActiveTask NOTIFY hasActiveTaskChanged)
+    Q_PROPERTY(bool showsOnlyCurrentScreen READ showsOnlyCurrentScreen WRITE setShowsOnlyCurrentScreen NOTIFY showsOnlyCurrentScreenChanged)
 
     explicit Backend(QObject *parent = nullptr);
     ~Backend() override;
@@ -63,7 +58,6 @@ public:
     Q_INVOKABLE QVariantList placesActions(const QUrl &launcherUrl, bool showAllPlaces, QObject *parent);
     Q_INVOKABLE QVariantList recentDocumentActions(const QUrl &launcherUrl, QObject *parent);
     Q_INVOKABLE void setActionGroup(QAction *action) const;
-    Q_INVOKABLE void setBlurBehind(QWindow *window, bool enable, int x, int y, int w, int h, int radius);
 
     Q_INVOKABLE QRect globalRect(QQuickItem *item) const;
 
@@ -74,48 +68,53 @@ public:
     Q_INVOKABLE static QUrl tryDecodeApplicationsUrl(const QUrl &launcherUrl);
     Q_INVOKABLE static QStringList applicationCategories(const QUrl &launcherUrl);
 
-    bool isMetaKeyHeld() const;
+    int screen() const;
+    void setScreen(int screen);
+
+    bool hasActiveTask() const;
+    void setHasActiveTask(bool active);
+
+    bool showsOnlyCurrentScreen() const;
+    void setShowsOnlyCurrentScreen(bool shows);
 
 Q_SIGNALS:
     void addLauncher(const QUrl &url) const;
 
     void showAllPlaces();
-    void metaKeyHeldChanged();
 
-public Q_SLOTS:
-    Q_SCRIPTABLE void metaKeyPressed();
-    Q_SCRIPTABLE void metaKeyReleased();
+    void screenChanged();
+    void hasActiveTaskChanged();
+    void showsOnlyCurrentScreenChanged();
+
+    void activateTaskAtIndexRequested(int index);
+    void activatePreviousTaskRequested();
+    void activateNextTaskRequested();
+    void moveActiveTaskBackwardRequested();
+    void moveActiveTaskForwardRequested();
 
 private Q_SLOTS:
     void handleRecentDocumentAction() const;
 
 private:
+    static void setupShortcuts();
+    static Backend *findTargetBackend();
+    static void dispatchActivateTaskAtIndex(int index);
+    static void dispatchActivatePreviousTask();
+    static void dispatchActivateNextTask();
+    static void dispatchMoveActiveTaskBackward();
+    static void dispatchMoveActiveTaskForward();
+
     QVariantList systemSettingsActions(QObject *parent) const;
 
     QActionGroup *m_actionGroup = nullptr;
     KActivities::Consumer *m_activitiesConsumer = nullptr;
 
+    static QVector<Backend *> s_instances;
+
+    int m_screen = -1;
+    bool m_hasActiveTask = false;
+    bool m_showsOnlyCurrentScreen = false;
+
     KActivityManagerdPluginsSettings m_activityManagerPluginsSettings;
     KConfigWatcher::Ptr m_activityManagerPluginsSettingsWatcher;
-
-    // Meta key detection via /dev/input monitoring
-    void setMetaKeyHeld(bool held);
-    void initInputMonitor();
-    void scanInputDevices();
-    void pruneProbedPaths();
-    void onInputEvent(int fd);
-    void removeInputDevice(int fd);
-
-    struct InputDeviceMonitor {
-        QString path;
-        QSocketNotifier *notifier = nullptr;
-    };
-
-    bool m_metaKeyHeld = false;
-    QFileSystemWatcher *m_inputDirWatcher = nullptr;
-    QTimer *m_inputSettleTimer = nullptr;
-    QHash<int, InputDeviceMonitor> m_inputMonitors;
-    QSet<QString> m_probedPaths;
 };
-
-} // namespace WaveTask

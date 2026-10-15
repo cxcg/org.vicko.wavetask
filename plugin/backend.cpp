@@ -1,34 +1,45 @@
 /*
-    SPDX-FileCopyrightText: 2012-2016 Eike Hein <hein@kde.org>
-
-    SPDX-License-Identifier: GPL-2.0-or-later
-*/
+ *    SPDX-FileCopyrightText: 2012-2016 Eike Hein <hein@kde.org>
+ *
+ *    SPDX-License-Identifier: GPL-2.0-or-later
+ */
 
 #include "backend.h"
 
 #include "log_settings.h"
+
+#include <KActionCollection>
 #include <KConfigGroup>
 #include <KDesktopFile>
+#include <KFileItem>
 #include <KFilePlacesModel>
 #include <KLocalizedString>
 #include <KNotificationJobUiDelegate>
+#include <KProtocolInfo>
 #include <KService>
 #include <KServiceAction>
 #include <KWindowEffects>
+#include <KWindowSystem>
 
 #include <KApplicationTrader>
 #include <KIO/ApplicationLauncherJob>
-#include <KIO/Global>
 
 #include <QAction>
 #include <QActionGroup>
+#include <QApplication>
+#include <QJsonArray>
 #include <QMenu>
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QStandardPaths>
 #include <QTimer>
-#include <QWindow>
+#include <QVersionNumber>
 
+#include <KGlobalAccel>
+
+#include <mutex>
+
+#include <PlasmaActivities/Consumer>
 #include <PlasmaActivities/Stats/Cleaning>
 #include <PlasmaActivities/Stats/ResultSet>
 #include <PlasmaActivities/Stats/Terms>
@@ -36,20 +47,6 @@
 #include <processcore/process.h>
 #include <processcore/processes.h>
 
-#include <QDBusConnection>
-#include <QSocketNotifier>
-#include <QDir>
-#include <QFileSystemWatcher>
-#include <QSet>
-
-#include <cerrno>
-#include <fcntl.h>
-#include <sys/ioctl.h>
-#include <unistd.h>
-#include <linux/input.h>
-
-namespace WaveTask
-{
 namespace KAStats = KActivities::Stats;
 
 using namespace KAStats;
@@ -57,10 +54,12 @@ using namespace KAStats::Terms;
 
 static constexpr int NoApplications = 2; // kactivitymanager StatsPlugin WhatToRemember.
 
+QVector<Backend *> Backend::s_instances;
+
 Backend::Backend(QObject *parent)
-    : QObject(parent)
-    , m_actionGroup(new QActionGroup(this))
-    , m_activityManagerPluginsSettingsWatcher(KConfigWatcher::create(m_activityManagerPluginsSettings.sharedConfig()))
+: QObject(parent)
+, m_actionGroup(new QActionGroup(this))
+, m_activityManagerPluginsSettingsWatcher(KConfigWatcher::create(m_activityManagerPluginsSettings.sharedConfig()))
 {
     connect(m_activityManagerPluginsSettingsWatcher.get(),
             &KConfigWatcher::configChanged,
@@ -69,266 +68,55 @@ Backend::Backend(QObject *parent)
                 if (group.name() == QLatin1String("Plugin-org.kde.ActivityManager.Resources.Scoring")
                     && names.contains(QByteArrayLiteral("what-to-remember"))) {
                     m_activityManagerPluginsSettings.load();
-                }
+                    }
             });
 
-    // Direct /dev/input keyboard monitoring (instant, no focus dependency)
-    initInputMonitor();
-
-    // Register D-Bus object for external communication
-    QDBusConnection::sessionBus().registerObject(
-        QStringLiteral("/WavetaskMeta"), this, QDBusConnection::ExportScriptableSlots);
-
-    qCDebug(WAVETASK_DEBUG) << "Backend: Meta detection via /dev/input + DBus";
+    s_instances.append(this);
+    setupShortcuts();
 }
 
 Backend::~Backend()
 {
-    for (auto it = m_inputMonitors.constBegin(); it != m_inputMonitors.constEnd(); ++it) {
-        delete it.value().notifier;
-        close(it.key());
+    s_instances.removeAll(this);
+}
+
+int Backend::screen() const
+{
+    return m_screen;
+}
+
+void Backend::setScreen(int screen)
+{
+    if (m_screen != screen) {
+        m_screen = screen;
+        Q_EMIT screenChanged();
     }
 }
 
-// --- Meta Key Detection ---
-
-bool Backend::isMetaKeyHeld() const
+bool Backend::hasActiveTask() const
 {
-    return m_metaKeyHeld;
+    return m_hasActiveTask;
 }
 
-void Backend::setMetaKeyHeld(bool held)
+void Backend::setHasActiveTask(bool active)
 {
-    if (m_metaKeyHeld != held) {
-        qCDebug(WAVETASK_DEBUG) << "Backend: metaKeyHeld changed to" << held;
-        m_metaKeyHeld = held;
-        Q_EMIT metaKeyHeldChanged();
+    if (m_hasActiveTask != active) {
+        m_hasActiveTask = active;
+        Q_EMIT hasActiveTaskChanged();
     }
 }
 
-// --- /dev/input Keyboard Monitoring ---
-
-void Backend::initInputMonitor()
+bool Backend::showsOnlyCurrentScreen() const
 {
-    // Initial scan for keyboards that are already connected
-    scanInputDevices();
-
-    // Short settle delay after a /dev/input change so udev finishes applying permissions to the new node
-    m_inputSettleTimer = new QTimer(this);
-    m_inputSettleTimer->setSingleShot(true);
-    m_inputSettleTimer->setInterval(500);
-    connect(m_inputSettleTimer, &QTimer::timeout, this, &Backend::scanInputDevices);
-
-    // inotify on /dev/input: probe only when nodes appear or disappear, no periodic polling
-    m_inputDirWatcher = new QFileSystemWatcher(this);
-    if (m_inputDirWatcher->addPath(QStringLiteral("/dev/input"))) {
-        connect(m_inputDirWatcher, &QFileSystemWatcher::directoryChanged, this, [this]() {
-            pruneProbedPaths();
-            m_inputSettleTimer->start();
-        });
-    } else {
-        // Fallback in case inotify is unavailable: periodic polling, now cheap because probed paths are remembered
-        auto *rescanTimer = new QTimer(this);
-        rescanTimer->setInterval(5000);
-        connect(rescanTimer, &QTimer::timeout, this, [this]() {
-            pruneProbedPaths();
-            scanInputDevices();
-        });
-
-        rescanTimer->start();
-    }
+    return m_showsOnlyCurrentScreen;
 }
 
-void Backend::scanInputDevices()
+void Backend::setShowsOnlyCurrentScreen(bool shows)
 {
-    QDir inputDir(QStringLiteral("/dev/input"));
-    const auto entries = inputDir.entryList({QStringLiteral("event*")}, QDir::System, QDir::Name);
-
-    for (const auto &name : entries) {
-        QString path = inputDir.absoluteFilePath(name);
-
-        if (m_probedPaths.contains(path)) {
-            continue; // Already probed before (monitored or rejected)
-        }
-
-        int fd = open(path.toUtf8().constData(), O_RDONLY | O_NONBLOCK);
-        if (fd < 0) {
-            // Don't remember the path: if udev hasn't applied permissions yet, the next /dev/input change retries it
-            continue;
-        }
-
-        // Each device is probed at most once per lifetime, monitored or not
-        m_probedPaths.insert(path);
-
-        // Check if this device supports EV_KEY events
-        unsigned long evBits[EV_CNT / (sizeof(unsigned long) * 8) + 1] = {};
-        if (ioctl(fd, EVIOCGBIT(0, sizeof(evBits)), evBits) < 0) {
-            close(fd);
-            continue;
-        }
-
-        if (!(evBits[EV_KEY / (sizeof(unsigned long) * 8)] & (1UL << (EV_KEY % (sizeof(unsigned long) * 8))))) {
-            close(fd);
-            continue;
-        }
-
-        // Check if it has the Meta keys
-        unsigned long keyBits[KEY_CNT / (sizeof(unsigned long) * 8) + 1] = {};
-        if (ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(keyBits)), keyBits) < 0) {
-            close(fd);
-            continue;
-        }
-
-        bool hasLeftMeta = keyBits[KEY_LEFTMETA / (sizeof(unsigned long) * 8)] & (1UL << (KEY_LEFTMETA % (sizeof(unsigned long) * 8)));
-        bool hasRightMeta = keyBits[KEY_RIGHTMETA / (sizeof(unsigned long) * 8)] & (1UL << (KEY_RIGHTMETA % (sizeof(unsigned long) * 8)));
-
-        if (!hasLeftMeta && !hasRightMeta) {
-            close(fd);
-            continue;
-        }
-
-        // This is a keyboard with Meta keys — monitor it
-        auto *notifier = new QSocketNotifier(fd, QSocketNotifier::Read, this);
-        connect(notifier, &QSocketNotifier::activated, this, [this, fd]() {
-            onInputEvent(fd);
-        });
-
-        m_inputMonitors.insert(fd, {path, notifier});
-
-        qCDebug(WAVETASK_DEBUG) << "Backend: monitoring keyboard" << path
-                                << "(fd=" << fd << ")";
+    if (m_showsOnlyCurrentScreen != shows) {
+        m_showsOnlyCurrentScreen = shows;
+        Q_EMIT showsOnlyCurrentScreenChanged();
     }
-}
-
-void Backend::pruneProbedPaths()
-{
-    QDir inputDir(QStringLiteral("/dev/input"));
-    const auto entries = inputDir.entryList({QStringLiteral("event*")}, QDir::System, QDir::Name);
-
-    QSet<QString> currentPaths;
-    for (const auto &name : entries) {
-        currentPaths.insert(inputDir.absoluteFilePath(name));
-    }
-
-    // Forget nodes that no longer exist, so a reconnection reusing the same path gets probed again
-    m_probedPaths.intersect(currentPaths);
-}
-
-void Backend::onInputEvent(int fd)
-{
-    struct input_event ev;
-
-    while (true) {
-        const ssize_t bytesRead = read(fd, &ev, sizeof(ev));
-
-        if (bytesRead == static_cast<ssize_t>(sizeof(ev))) {
-            if (ev.type == EV_KEY &&
-                (ev.code == KEY_LEFTMETA || ev.code == KEY_RIGHTMETA)) {
-                if (ev.value == 1) {
-                    // Press
-                    qCDebug(WAVETASK_DEBUG) << "Backend: Meta pressed (fd=" << fd << ")";
-                    setMetaKeyHeld(true);
-                } else if (ev.value == 0) {
-                    // Release
-                    qCDebug(WAVETASK_DEBUG) << "Backend: Meta released (fd=" << fd << ")";
-                    setMetaKeyHeld(false);
-                }
-
-                // value == 2 (auto-repeat): ignored for modifier keys
-            }
-
-            continue;
-        }
-
-        if (bytesRead < 0 && errno == EINTR) {
-            continue;
-        }
-
-        if (bytesRead < 0 && errno == EAGAIN) {
-            break; // No more events pending
-        }
-
-        // EOF or error (e.g. ENODEV on keyboard unplug): tear down the monitor so the notifier doesn't fire in a busy loop
-        removeInputDevice(fd);
-        break;
-    }
-}
-
-void Backend::removeInputDevice(int fd)
-{
-    const InputDeviceMonitor monitor = m_inputMonitors.take(fd);
-    if (!monitor.notifier) {
-        return;
-    }
-
-    monitor.notifier->setEnabled(false);
-    monitor.notifier->deleteLater();
-    close(fd);
-
-    // Forget the path (unless another fd already monitors the node that reused it) so a reconnection gets probed again
-    bool pathStillMonitored = false;
-    for (const auto &other : std::as_const(m_inputMonitors)) {
-        if (other.path == monitor.path) {
-            pathStillMonitored = true;
-            break;
-        }
-    }
-
-    if (!pathStillMonitored) {
-        m_probedPaths.remove(monitor.path);
-    }
-
-    qCDebug(WAVETASK_DEBUG) << "Backend: stopped monitoring" << monitor.path << "(fd=" << fd << ")";
-}
-
-// --- End Input Monitor ---
-
-void Backend::metaKeyPressed()
-{
-    qCDebug(WAVETASK_DEBUG) << "Backend: D-Bus metaKeyPressed called";
-    setMetaKeyHeld(true);
-}
-
-void Backend::metaKeyReleased()
-{
-    qCDebug(WAVETASK_DEBUG) << "Backend: D-Bus metaKeyReleased called";
-    setMetaKeyHeld(false);
-}
-
-// --- End Meta Key Detection ---
-
-void Backend::setBlurBehind(QWindow *window, bool enable, int x, int y, int w, int h, int radius)
-{
-    if (!window) {
-        return;
-    }
-
-    QRegion region;
-
-    if (enable && w > 0 && h > 0) {
-        const int d = radius * 2;
-        // Creamos el rectángulo base
-        QRegion rect(x, y, w, h);
-
-        // Definimos las esquinas cuadradas que vamos a quitar
-        QRegion corners;
-        corners += QRegion(x, y, radius, radius); // Top-left
-        corners += QRegion(x + w - radius, y, radius, radius); // Top-right
-        corners += QRegion(x, y + h - radius, radius, radius); // Bottom-left
-        corners += QRegion(x + w - radius, y + h - radius, radius, radius); // Bottom-right
-
-        rect -= corners;
-
-        // Añadimos los círculos en las esquinas para dar el efecto redondeado
-        rect += QRegion(x, y, d, d, QRegion::Ellipse);
-        rect += QRegion(x + w - d, y, d, d, QRegion::Ellipse);
-        rect += QRegion(x, y + h - d, d, d, QRegion::Ellipse);
-        rect += QRegion(x + w - d, y + h - d, d, d, QRegion::Ellipse);
-
-        region = rect;
-    }
-
-    KWindowEffects::enableBlurBehind(window, enable, region);
 }
 
 QUrl Backend::tryDecodeApplicationsUrl(const QUrl &launcherUrl)
@@ -594,7 +382,6 @@ QVariantList Backend::recentDocumentActions(const QUrl &launcherUrl, QObject *pa
     const QString downloadsPath = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
 
     while (actionCount < 5 && resultIt != results.end()) {
-        const QString resource = (*resultIt).resource();
         const QString mimetype = (*resultIt).mimetype();
         const QUrl url = (*resultIt).url();
         ++resultIt;
@@ -705,7 +492,7 @@ void Backend::handleRecentDocumentAction() const
                 // no service found to handle the mimetype
                 return;
             } else {
-                qCWarning(WAVETASK_DEBUG) << "Preventing the file to open with " << service->desktopEntryName() << "no alternative found";
+                qCWarning(TASKMANAGER_DEBUG) << "Preventing the file to open with " << service->desktopEntryName() << "no alternative found";
             }
         }
     }
@@ -781,6 +568,136 @@ qint64 Backend::parentPid(qint64 pid) const
     return -1;
 }
 
-} // namespace WaveTask
+void Backend::setupShortcuts()
+{
+    static std::once_flag once;
+    std::call_once(once, [] {
+        auto *collection = new KActionCollection(QCoreApplication::instance());
+
+        auto *activatePreviousTaskAction = collection->addAction(QStringLiteral("activate previous task manager entry"));
+        QObject::connect(activatePreviousTaskAction, &QAction::triggered, collection, [](bool) {
+            dispatchActivatePreviousTask();
+        });
+        activatePreviousTaskAction->setText(i18n("Activate Previous Task Manager Entry"));
+        KGlobalAccel::self()->setGlobalShortcut(activatePreviousTaskAction, QList<QKeySequence>() << QKeySequence(Qt::META | Qt::CTRL | Qt::Key_PageUp));
+
+        auto *activateNextTaskAction = collection->addAction(QStringLiteral("activate next task manager entry"));
+        QObject::connect(activateNextTaskAction, &QAction::triggered, collection, [](bool) {
+            dispatchActivateNextTask();
+        });
+        activateNextTaskAction->setText(i18n("Activate Next Task Manager Entry"));
+        KGlobalAccel::self()->setGlobalShortcut(activateNextTaskAction, QList<QKeySequence>() << QKeySequence(Qt::META | Qt::CTRL | Qt::Key_PageDown));
+
+        auto *moveTaskBackwardAction = collection->addAction(QStringLiteral("move active task to left"));
+        QObject::connect(moveTaskBackwardAction, &QAction::triggered, collection, [](bool) {
+            dispatchMoveActiveTaskBackward();
+        });
+        moveTaskBackwardAction->setText(i18n("Move Active Task Manager Entry Backward"));
+        KGlobalAccel::self()->setGlobalShortcut(moveTaskBackwardAction,
+                                                QList<QKeySequence>() << QKeySequence(Qt::META | Qt::CTRL | Qt::SHIFT | Qt::Key_PageUp));
+
+        auto *moveTaskForwardAction = collection->addAction(QStringLiteral("move active task to right"));
+        QObject::connect(moveTaskForwardAction, &QAction::triggered, collection, [](bool) {
+            dispatchMoveActiveTaskForward();
+        });
+        moveTaskForwardAction->setText(i18n("Move Active Task Manager Entry Forward"));
+        KGlobalAccel::self()->setGlobalShortcut(moveTaskForwardAction,
+                                                QList<QKeySequence>() << QKeySequence(Qt::META | Qt::CTRL | Qt::SHIFT | Qt::Key_PageDown));
+
+        for (int i = 0; i < 10; ++i) {
+            const int entryNumber = i + 1;
+            const auto key = static_cast<Qt::Key>(Qt::Key_0 + (entryNumber % 10));
+
+            QAction *action = collection->addAction(QStringLiteral("activate task manager entry %1").arg(QString::number(entryNumber)));
+            action->setText(i18n("Activate Task Manager Entry %1", entryNumber));
+            KGlobalAccel::setGlobalShortcut(action, entryNumber < 10 ? QKeySequence(Qt::META | key) : QKeySequence());
+            QObject::connect(action, &QAction::triggered, collection, [i](bool) {
+                dispatchActivateTaskAtIndex(i);
+            });
+        }
+    });
+}
+
+Backend *Backend::findTargetBackend()
+{
+    // Prefer a bar that shows tasks from all screens so that cycling
+    // shortcuts can see the full task list.  Screen-filtered bars are
+    // only used as fallback when no full-view bar has the active task.
+    // This avoids trapping shortcuts on a screen-filtered bar that may
+    // only have a single task to cycle through (e.g. when a grouped app
+    // has its only visible child on that screen).
+
+    Backend *fallback = nullptr;
+
+    for (auto *instance : std::as_const(s_instances)) {
+        if (!instance->m_hasActiveTask) {
+            continue;
+        }
+        if (!instance->m_showsOnlyCurrentScreen) {
+            return instance;
+        }
+        if (!fallback) {
+            fallback = instance;
+        }
+    }
+
+    return fallback;
+}
+
+void Backend::dispatchActivateTaskAtIndex(int index)
+{
+    // Prefer the same priority order as the other task shortcuts:
+    // 1. Non-screen-filtered taskbar with the active task
+    // 2. Screen-filtered taskbar with the active task
+    if (auto *target = findTargetBackend()) {
+        Q_EMIT target->activateTaskAtIndexRequested(index);
+        return;
+    }
+
+    // If no task is active on any taskmanager (e.g. the user wants to
+    // launch a pinned app), fallback: prefer a non-screen-filtered
+    // instance, then the first available instance.
+    Backend *fallback = nullptr;
+    for (auto *instance : std::as_const(s_instances)) {
+        if (!instance->m_showsOnlyCurrentScreen) {
+            Q_EMIT instance->activateTaskAtIndexRequested(index);
+            return;
+        }
+        if (!fallback) {
+            fallback = instance;
+        }
+    }
+    if (fallback) {
+        Q_EMIT fallback->activateTaskAtIndexRequested(index);
+    }
+}
+
+void Backend::dispatchActivatePreviousTask()
+{
+    if (auto *target = findTargetBackend()) {
+        Q_EMIT target->activatePreviousTaskRequested();
+    }
+}
+
+void Backend::dispatchActivateNextTask()
+{
+    if (auto *target = findTargetBackend()) {
+        Q_EMIT target->activateNextTaskRequested();
+    }
+}
+
+void Backend::dispatchMoveActiveTaskBackward()
+{
+    if (auto *target = findTargetBackend()) {
+        Q_EMIT target->moveActiveTaskBackwardRequested();
+    }
+}
+
+void Backend::dispatchMoveActiveTaskForward()
+{
+    if (auto *target = findTargetBackend()) {
+        Q_EMIT target->moveActiveTaskForwardRequested();
+    }
+}
 
 #include "moc_backend.cpp"
