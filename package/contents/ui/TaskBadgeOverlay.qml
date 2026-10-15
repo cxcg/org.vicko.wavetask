@@ -33,7 +33,7 @@ Item {
             visible: task.smartLauncherItem.countVisible
             width: badgeRect.width + root.offset * 2
             height: badgeRect.height + root.offset * 2
-            radius: badgeRect.radius + root.offset * 2
+            radius: height
 
             // Badge changes width based on number.
             onWidthChanged: maskShaderSource.scheduleUpdate()
@@ -75,7 +75,7 @@ Item {
         onHeightChanged: maskShaderSource.scheduleUpdate()
     }
 
-    Badge {
+    Kirigami.Badge {
         id: badgeRect
 
         anchors.right: parent.right
@@ -86,8 +86,11 @@ Item {
             NumberAnimation { duration: Kirigami.Units.longDuration }
         }
 
-        height: Math.round((icon.height/2) * 0.45)
         visible: task.smartLauncherItem.countVisible
-        number: task.smartLauncherItem.count
+        padding: 1
+
+        text: task.smartLauncherItem.count > 9999
+        ? i18nc("Over 9999 new messages, overlay, keep short", "9,999+")
+        : task.smartLauncherItem.count.toLocaleString(Qt.locale(), 'f', 0)
     }
 }
