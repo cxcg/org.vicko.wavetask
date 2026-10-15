@@ -47,16 +47,15 @@ GridLayout {
         if (Plasmoid.configuration.maxStripes === 1) {
             return 1;
         }
+        if (Plasmoid.configuration.forceStripes) {
+            return Plasmoid.configuration.maxStripes;
+        }
 
         // The maximum number of stripes allowed by the applet's size
         const stripeSizeLimit = vertical
             ? Math.floor(parent.width / children[0].implicitWidth)
             : Math.floor(parent.height / children[0].implicitHeight)
         const maxStripes = Math.min(Plasmoid.configuration.maxStripes, stripeSizeLimit)
-
-        if (Plasmoid.configuration.forceStripes) {
-            return maxStripes;
-        }
 
         // The number of tasks that will fill a "stripe" before starting the next one
         const maxTasksPerStripe = vertical
