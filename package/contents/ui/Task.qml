@@ -17,6 +17,7 @@ import org.kde.plasma.components as PlasmaComponents3
 import org.kde.kirigami as Kirigami
 import org.vicko.wavetask as TaskManagerApplet
 import org.kde.plasma.plasmoid
+import org.vicko.wavetask as TaskManager
 
 import "code/LayoutMetrics.js" as LayoutMetrics
 import "code/TaskTools.js" as TaskTools
@@ -439,7 +440,7 @@ PlasmaCore.ToolTipArea {
                 } else if (Plasmoid.configuration.middleClickAction === TaskManagerApplet.Backend.ToggleGrouping) {
                     tasksModel.requestToggleGrouping(modelIndex());
                 } else if (Plasmoid.configuration.middleClickAction === TaskManagerApplet.Backend.BringToCurrentDesktop) {
-                    tasksModel.requestVirtualDesktops(modelIndex(), [virtualDesktopInfo.currentDesktop]);
+                    tasksModel.requestVirtualDesktops(modelIndex(), [virtualDesktopInfo.currentDesktopByScreenGeometry(tasksModel.data(modelIndex(), TaskManager.AbstractTasksModel.ScreenGeometry))]);
                 }
             } else if (button === Qt.BackButton || button === Qt.ForwardButton) {
                 const playerData = mpris2Source.playerForLauncherUrl(task.model.LauncherUrlWithoutIcon, task.model.AppPid);
