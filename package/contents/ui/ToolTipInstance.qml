@@ -130,7 +130,12 @@ ColumnLayout {
                     maximumLineCount: 2
                     wrapMode: Text.Wrap
                     Layout.fillWidth: true
+                    // For horizontal grouped tasks, leave room for two lines so thumbnails align
+                    Layout.preferredHeight: root.orientation === ListView.Horizontal && lineCount === 1
+                    ? implicitHeight * 2
+                    : implicitHeight
                     elide: Text.ElideRight
+                    verticalAlignment: Text.AlignVCenter
                     property bool somethingVisible: (thumbnailSourceItem.visible ||
                         appNameHeading.visible || subtext.visible)
                     text: ((root.titleIncludesTrack && playerController.active) ||
@@ -147,7 +152,12 @@ ColumnLayout {
                     maximumLineCount: 2
                     wrapMode: Text.Wrap
                     Layout.fillWidth: true
+                    // For horizontal grouped tasks, leave room for two lines so thumbnails align
+                    Layout.preferredHeight: root.orientation === ListView.Horizontal && lineCount === 1
+                    ? implicitHeight * 2
+                    : implicitHeight
                     elide: Text.ElideRight
+                    verticalAlignment: Text.AlignVCenter
                     text: toolTipDelegate.isWin ? root.generateSubText() : ""
                     color: (headerHoverHandler.visible && headerHoverHighlight.pressed) ? Kirigami.Theme.highlightedTextColor : Kirigami.Theme.textColor
                     opacity: 0.75
