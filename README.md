@@ -92,6 +92,20 @@ make -j$(nproc)
 
 sudo make install
 
+## Global keyboard shortcuts
+
+Wave Task Manager registers its shortcuts under the **Wave Task Manager** group to prevent conflicts with Plasma's built-in task manager.
+On Plasma 6.8, task-switching shortcuts are handled directly inside the task manager backend rather than the central desktop shell.
+
+After installing the compiled plugin, log out and back in so Plasma loads the new binary:
+
+1. Open **System Settings → Keyboard → Shortcuts** and select **Wave Task Manager**.
+2. Assign **Meta+1** through **Meta+9** to **Activate Task Manager Entry 1** through **Activate Task Manager Entry 9**.
+3. Assign **Meta+0** to **Activate Task Manager Entry 10** if desired.
+4. When prompted that the shortcut conflicts with **plasmashell**, confirm reassigning it to Wave Task Manager, then apply the changes.
+
+Task cycling and moving shortcuts are also available under the **Wave Task Manager** group.
+
 ## Features:
 
 - It inherits all the features of Plasma's task manager
