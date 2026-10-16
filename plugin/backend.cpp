@@ -492,7 +492,7 @@ void Backend::handleRecentDocumentAction() const
                 // no service found to handle the mimetype
                 return;
             } else {
-                qCWarning(TASKMANAGER_DEBUG) << "Preventing the file to open with " << service->desktopEntryName() << "no alternative found";
+                qCWarning(WAVETASK_DEBUG) << "Preventing the file to open with " << service->desktopEntryName() << "no alternative found";
             }
         }
     }
@@ -572,7 +572,8 @@ void Backend::setupShortcuts()
 {
     static std::once_flag once;
     std::call_once(once, [] {
-        auto *collection = new KActionCollection(QCoreApplication::instance());
+        auto *collection = new KActionCollection(QCoreApplication::instance(), QStringLiteral("org.vicko.wavetask"));
+        collection->setComponentDisplayName(i18n("Wave Task Manager"));
 
         auto *activatePreviousTaskAction = collection->addAction(QStringLiteral("activate previous task manager entry"));
         QObject::connect(activatePreviousTaskAction, &QAction::triggered, collection, [](bool) {
