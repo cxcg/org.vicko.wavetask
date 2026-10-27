@@ -914,6 +914,40 @@ void Backend::dispatchMoveActiveTaskForward()
     }
 }
 
+void Backend::setBlurBehind(QWindow *window, bool enable, int x, int y, int w, int h, int radius)
+{
+    if (!window) {
+        return;
+    }
+
+    QRegion region;
+
+    if (enable && w > 0 && h > 0) {
+        const int d = radius * 2;
+        // Creamos el rectángulo base
+        QRegion rect(x, y, w, h);
+
+        // Definimos las esquinas cuadradas que vamos a quitar
+        QRegion corners;
+        corners += QRegion(x, y, radius, radius); // Top-left
+        corners += QRegion(x + w - radius, y, radius, radius); // Top-right
+        corners += QRegion(x, y + h - radius, radius, radius); // Bottom-left
+        corners += QRegion(x + w - radius, y + h - radius, radius, radius); // Bottom-right
+
+        rect -= corners;
+
+        // Añadimos los círculos en las esquinas para dar el efecto redondeado
+        rect += QRegion(x, y, d, d, QRegion::Ellipse);
+        rect += QRegion(x + w - d, y, d, d, QRegion::Ellipse);
+        rect += QRegion(x, y + h - d, d, d, QRegion::Ellipse);
+        rect += QRegion(x + w - d, y + h - d, d, d, QRegion::Ellipse);
+
+        region = rect;
+    }
+
+    KWindowEffects::enableBlurBehind(window, enable, region);
+}
+
 } // namespace WaveTask
 
 #include "moc_backend.cpp"

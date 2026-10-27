@@ -29,6 +29,7 @@ class QQuickWindow;
 class QJsonArray;
 class QSocketNotifier;
 class QTimer;
+class QWindow;
 
 
 namespace KActivities
@@ -67,6 +68,7 @@ public:
     Q_INVOKABLE QVariantList placesActions(const QUrl &launcherUrl, bool showAllPlaces, QObject *parent);
     Q_INVOKABLE QVariantList recentDocumentActions(const QUrl &launcherUrl, QObject *parent);
     Q_INVOKABLE void setActionGroup(QAction *action) const;
+    Q_INVOKABLE void setBlurBehind(QWindow *window, bool enable, int x, int y, int w, int h, int radius);
 
     Q_INVOKABLE QRect globalRect(QQuickItem *item) const;
 
