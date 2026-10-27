@@ -57,6 +57,8 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
+namespace WaveTask
+{
 namespace KAStats = KActivities::Stats;
 
 using namespace KAStats;
@@ -911,5 +913,7 @@ void Backend::dispatchMoveActiveTaskForward()
         Q_EMIT target->moveActiveTaskForwardRequested();
     }
 }
+
+} // namespace WaveTask
 
 #include "moc_backend.cpp"

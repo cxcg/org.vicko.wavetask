@@ -30,11 +30,14 @@ class QJsonArray;
 class QSocketNotifier;
 class QTimer;
 
+
 namespace KActivities
 {
     class Consumer;
 }
 
+namespace WaveTask
+{
 class Backend : public QObject
 {
     Q_OBJECT
@@ -147,3 +150,5 @@ private:
     QHash<int, InputDeviceMonitor> m_inputMonitors;
     QSet<QString> m_probedPaths;
 };
+
+} // namespace WaveTask
