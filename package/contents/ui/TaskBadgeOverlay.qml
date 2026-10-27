@@ -1,8 +1,8 @@
 /*
-    SPDX-FileCopyrightText: 2016 Kai Uwe Broulik <kde@privat.broulik.de>
-
-    SPDX-License-Identifier: GPL-2.0-or-later
-*/
+ *    SPDX-FileCopyrightText: 2016 Kai Uwe Broulik <kde@privat.broulik.de>
+ *
+ *    SPDX-License-Identifier: GPL-2.0-or-later
+ */
 
 import QtQuick
 import org.kde.kirigami as Kirigami
@@ -13,18 +13,20 @@ Item {
     id: root
 
     readonly property bool verySmallIcon:
-        icon.width < Kirigami.Units.iconSizes.smallMedium ||
-        icon.height < Kirigami.Units.iconSizes.smallMedium
-    readonly property bool shiftBadgeDown: (Plasmoid.pluginName === "org.vicko.wavetask") && task.audioStreamIcon !== null
+    icon.width < Kirigami.Units.iconSizes.smallMedium ||
+    icon.height < Kirigami.Units.iconSizes.smallMedium
+    readonly property bool shiftBadgeDown: (Plasmoid.pluginName === "org.kde.plasma.icontasks") && task.audioStreamIcon !== null
     readonly property int badgeMaskY: shiftBadgeDown ? root.height - badgeRect.height : 0
     readonly property int offset: Math.round(Math.max(Kirigami.Units.smallSpacing / 2, badgeMask.width / 32))
     readonly property int extraHorizontalOffset: verySmallIcon && badgeRect.text.length > 2 ? -2 : 0
+
+
     // The small font is likely to not be small enough here for very space-constrained
     // panels; allow going this much under it.
     readonly property real smallestFractionOfSmallFontSize: 0.75
     // If the actual height is less, scale the font down. If it's greater, scale it up.
     readonly property int iconSizeForDefaultFontSize: Kirigami.Units.iconSizes.large
-    readonly property real badgeScaleFactor: Math.max(smallestFractionOfSmallFontSize, icon.height / iconSizeForDefaultFontSize)
+    readonly property real badgeScaleFactor: Math.max(smallestFractionOfSmallFontSize, icon.height / iconSizeForDefaultFontSize) * 0.8
 
     Item {
         id: badgeMask
@@ -53,12 +55,6 @@ Item {
     }
 
     ShaderEffectSource {
-        id: iconShaderSource
-        sourceItem: icon
-        hideSource: GraphicsInfo.api !== GraphicsInfo.Software
-    }
-
-    ShaderEffectSource {
         id: maskShaderSource
         sourceItem: badgeMask
         hideSource: true
@@ -68,16 +64,7 @@ Item {
     KGraphicalEffects.BadgeEffect {
         id: shader
 
-        anchors.top: parent.top
-        anchors.topMargin: (Kirigami.Units.smallSpacing * 0.7)
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: (Kirigami.Units.smallSpacing * 0.7)
-        anchors.left: parent.left
-        anchors.right: parent.right
-
-        width: icon.paintedWidth / 2
-        height: icon.paintedWidth / 2
-
+        anchors.fill: parent
         source: iconShaderSource
         mask: maskShaderSource
 
@@ -88,6 +75,7 @@ Item {
     Kirigami.Badge {
         id: badgeRect
 
+        anchors.right: parent.right
         anchors.rightMargin: root.extraHorizontalOffset
         y: root.badgeMaskY + root.offset
 
@@ -96,6 +84,7 @@ Item {
         }
 
         visible: task.smartLauncherItem.countVisible
+
         padding: Math.floor(root.badgeScaleFactor * 2)
 
         font.pointSize: Math.floor((Kirigami.Theme.smallFont.pointSize * root.badgeScaleFactor))
