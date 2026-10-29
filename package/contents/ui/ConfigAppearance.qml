@@ -45,6 +45,10 @@ KCMUtils.SimpleKCM {
     property alias cfg_amplitud: amplitudSlider.value
     property string cfg_skinName: Plasmoid.configuration.skinName
     property alias cfg_showReflection: showReflection.checked
+    property alias cfg_runningIndicatorStyle: runningIndicatorStyle.currentIndex
+    property alias cfg_runningIndicatorLength: runningIndicatorLength.value
+    property alias cfg_runningIndicatorThickness: runningIndicatorThickness.value
+    property alias cfg_runningIndicatorOpacity: runningIndicatorOpacity.value
 
     // Visual-only separator controls, saved automatically via KConfig.
     property alias cfg_showDockSeparator: showDockSeparator.checked
@@ -208,6 +212,57 @@ KCMUtils.SimpleKCM {
             id: showReflection
             Kirigami.FormData.label: i18nc("@label", "Reflection:")
             text: i18nc("@option:check", "Show icon reflection below dock")
+        }
+
+        Item {
+            Kirigami.FormData.isSection: true
+            visible: root.iconOnly
+        }
+
+        QQC2.ComboBox {
+            id: runningIndicatorStyle
+            visible: root.iconOnly
+            Kirigami.FormData.label: i18n("Running indicators:")
+            model: [
+                i18n("Original skin"),
+                i18n("Dot"),
+                i18n("Short line"),
+                i18n("Pill")
+            ]
+        }
+
+        QQC2.SpinBox {
+            id: runningIndicatorLength
+            visible: root.iconOnly
+            enabled: runningIndicatorStyle.currentIndex > 1
+            Kirigami.FormData.label: i18n("Indicator length (px):")
+            from: 4
+            to: 32
+        }
+
+        QQC2.SpinBox {
+            id: runningIndicatorThickness
+            visible: root.iconOnly
+            enabled: runningIndicatorStyle.currentIndex !== 0
+            Kirigami.FormData.label: i18n("Indicator thickness (px):")
+            from: 2
+            to: 8
+        }
+
+        RowLayout {
+            visible: root.iconOnly
+            enabled: runningIndicatorStyle.currentIndex !== 0
+            Kirigami.FormData.label: i18n("Indicator opacity:")
+            QQC2.Slider {
+                id: runningIndicatorOpacity
+                Layout.fillWidth: true
+                from: 0.1
+                to: 1
+                stepSize: 0.05
+            }
+            QQC2.Label {
+                text: Math.round(runningIndicatorOpacity.value * 100) + "%"
+            }
         }
 
         QQC2.CheckBox {
