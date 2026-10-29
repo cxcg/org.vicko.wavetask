@@ -181,6 +181,39 @@
       <label>Whether holding the Meta/Win key should display task index numbers above each icon.</label>
       <default>true</default>
     </entry>
+    <!-- Pinned-launcher / running-task separator. -->
+    <entry name="showDockSeparator" type="Bool">
+      <default>true</default>
+    </entry>
+    <entry name="separatorGap" type="Int">
+      <default>22</default>
+    </entry>
+    <entry name="separatorThickness" type="Int">
+      <default>2</default>
+    </entry>
+    <entry name="separatorLength" type="Int">
+      <default>28</default>
+    </entry>
+    <entry name="separatorOpacity" type="Double">
+      <default>0.45</default>
+    </entry>
+
+    <!-- Rounded background is opt-in, so existing skins remain unchanged. -->
+    <entry name="roundedBackgroundEnabled" type="Bool">
+      <default>false</default>
+    </entry>
+    <entry name="roundedBackgroundColor" type="String">
+      <default>#252A32</default>
+    </entry>
+    <entry name="roundedBackgroundOpacity" type="Double">
+      <default>0.55</default>
+    </entry>
+    <entry name="roundedBackgroundRadius" type="Int">
+      <default>18</default>
+    </entry>
+    <entry name="roundedBackgroundPadding" type="Int">
+      <default>12</default>
+    </entry>
   </group>
 
 </kcfg>
