@@ -530,6 +530,11 @@ PlasmoidItem {
                 loadSkinConfig();
             }
 
+            // Reset stale blur regions when switching the optional rounded background.
+            function onRoundedBackgroundEnabledChanged() {
+                loadSkinConfig();
+            }
+
             function onLaunchersChanged(): void {
                 tasksModel.launcherList = Plasmoid.configuration.launchers
             }
@@ -606,7 +611,41 @@ PlasmoidItem {
             id: backgroundLoader
 
             anchors.fill: parent
-            sourceComponent: (Plasmoid.configuration.skinName === "Default Plasma") ? defaultSkin : customSkin
+            sourceComponent: Plasmoid.configuration.roundedBackgroundEnabled
+                ? roundedBackgroundSkin
+                : (Plasmoid.configuration.skinName === "Default Plasma" ? defaultSkin : customSkin)
+        }
+
+        // Optional flat/rounded backdrop; leaves the KDE/skin renderers intact by default.
+        Component {
+            id: roundedBackgroundSkin
+
+            Item {
+                Rectangle {
+                    id: roundedDockBackground
+                    visible: tasksModel.count > 0
+                    z: -1
+
+                    readonly property real padding: Plasmoid.configuration.roundedBackgroundPadding
+                    readonly property real thickness: Plasmoid.configuration.iconSize + padding * 2
+                    readonly property real length: taskList.iconsTotalSize + padding * 2
+
+                    width: tasks.vertical ? thickness : length
+                    height: tasks.vertical ? length : thickness
+                    x: tasks.vertical
+                        ? (tasks.isLeftPanel ? 0 : parent.width - width)
+                        : (parent.width - width) / 2
+                    y: tasks.vertical
+                        ? (parent.height - height) / 2
+                        : (tasks.isTopPanel ? 0 : parent.height - height)
+
+                    radius: Math.min(Plasmoid.configuration.roundedBackgroundRadius,
+                                     Math.min(width, height) / 2)
+                    color: Plasmoid.configuration.roundedBackgroundColor
+                    opacity: Plasmoid.configuration.roundedBackgroundOpacity
+                    antialiasing: true
+                }
+            }
         }
 
         // --- Componente 1: DEFAULT (SVG) ---
@@ -625,7 +664,8 @@ PlasmoidItem {
 
                 readonly property real baseIconsSize:
                 taskRepeater.count * Plasmoid.configuration.iconSize +
-                Math.max(0, taskRepeater.count - 1) * taskList.spacing
+                Math.max(0, taskRepeater.count - 1) * taskList.spacing +
+                taskList.separatorSpace
 
                 readonly property real verticalOffsetX: -Kirigami.Units.smallSpacing * 0.5
 
@@ -979,7 +1019,25 @@ PlasmoidItem {
                 readonly property real _zoom: (Plasmoid.configuration.magnification || 0) / 100
                 readonly property real maxZoom: 1.0 + (Plasmoid.configuration.magnification || 0) / 100
 
-                readonly property real baseContentSize: taskRepeater.count * Plasmoid.configuration.iconSize + Math.max(0, taskRepeater.count - 1) * spacing
+                // The task model already sorts launchers before unrelated windows.
+                // Use its logical launcher count to preserve pinned running apps.
+                readonly property int separatorBoundary: Math.max(0,
+                    Math.min(tasksModel.logicalLauncherCount, taskRepeater.count))
+                readonly property bool separatorVisible: Plasmoid.configuration.showDockSeparator
+                    && separatorBoundary > 0 && separatorBoundary < taskRepeater.count
+                readonly property real separatorSpace: separatorVisible
+                    ? Plasmoid.configuration.separatorGap : 0
+                readonly property real separatorAxis: {
+                    if (!separatorVisible) return 0;
+                    const lastPinned = taskRepeater.itemAt(separatorBoundary - 1);
+                    if (!lastPinned) return 0;
+                    return lastPinned.itemPos
+                        + (tasks.vertical ? lastPinned.height : lastPinned.width)
+                        + spacing + separatorSpace / 2;
+                }
+
+                readonly property real baseContentSize: taskRepeater.count * Plasmoid.configuration.iconSize
+                    + Math.max(0, taskRepeater.count - 1) * spacing + separatorSpace
 
                 // Integral gaussiana aproximada
                 readonly property real zoomExtraSize: _zoom * _sigma * Math.sqrt(2 * Math.PI)
@@ -1003,7 +1061,8 @@ PlasmoidItem {
                        }
                    }
 
-                   return total;
+                   // Include exactly one reserved separator slot in centering.
+                   return total + separatorSpace;
                }
 
                readonly property real centerOffset: {
@@ -1054,9 +1113,7 @@ PlasmoidItem {
                     id: dockHoverHandler
 
                     onPointChanged: {
-                        let mappedPos = taskList.mapToItem(tasks, point.position.x, point.position.y)
-
-                        let mousePos = tasks.vertical ? mappedPos.y : mappedPos.x
+                        let mousePos = tasks.vertical ? point.position.y : point.position.x
 
                         if (taskList.smoothMouse < 0) {
                             taskList.smoothMouse = mousePos
@@ -1132,6 +1189,9 @@ PlasmoidItem {
                                 pos += size + taskList.spacing;
                             }
 
+                            if (taskList.separatorVisible && index >= taskList.separatorBoundary) {
+                                pos += taskList.separatorSpace;
+                            }
                             return pos;
                         }
 
@@ -1144,6 +1204,29 @@ PlasmoidItem {
                         : undefined
                     }
                 }
+            }
+
+            // Visual-only element; never becomes a TaskModel row or takes drag events.
+            Rectangle {
+                id: dockSeparator
+                visible: taskList.separatorVisible
+                z: 4
+                width: tasks.vertical
+                    ? Plasmoid.configuration.separatorLength
+                    : Plasmoid.configuration.separatorThickness
+                height: tasks.vertical
+                    ? Plasmoid.configuration.separatorThickness
+                    : Plasmoid.configuration.separatorLength
+                radius: Math.min(width, height) / 2
+                color: Kirigami.Theme.textColor
+                opacity: Plasmoid.configuration.separatorOpacity
+                antialiasing: true
+                x: taskList.x + (tasks.vertical
+                    ? (taskList.width - width) / 2
+                    : taskList.separatorAxis - width / 2)
+                y: taskList.y + (tasks.vertical
+                    ? taskList.separatorAxis - height / 2
+                    : (taskList.height - height) / 2)
             }
         }
 
