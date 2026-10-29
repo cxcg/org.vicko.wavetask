@@ -79,3 +79,15 @@ function baseIconCenter(index, count, iconSize, spacing, available,
 function skinOverflow(containmentLength, crossLength) {
     return Math.max(0, containmentLength - crossLength);
 }
+
+// Locate the running marker next to the panel edge (not the opposite edge).
+// Top/left panels use the leading edge; bottom/right panels the trailing edge.
+function indicatorX(vertical, isLeft, parentWidth, markerWidth, margin) {
+    return vertical ? (isLeft ? margin : parentWidth - markerWidth - margin)
+                    : (parentWidth - markerWidth) / 2;
+}
+
+function indicatorY(vertical, isTop, parentHeight, markerHeight, margin) {
+    return vertical ? (parentHeight - markerHeight) / 2
+                    : (isTop ? margin : parentHeight - markerHeight - margin);
+}
