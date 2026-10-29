@@ -181,6 +181,19 @@
       <label>Whether holding the Meta/Win key should display task index numbers above each icon.</label>
       <default>true</default>
     </entry>
+    <!-- 0 = original skin; 1 = dot; 2 = line; 3 = pill. -->
+    <entry name="runningIndicatorStyle" type="Int">
+      <default>0</default>
+    </entry>
+    <entry name="runningIndicatorLength" type="Int">
+      <default>16</default>
+    </entry>
+    <entry name="runningIndicatorThickness" type="Int">
+      <default>4</default>
+    </entry>
+    <entry name="runningIndicatorOpacity" type="Double">
+      <default>0.65</default>
+    </entry>
     <!-- Pinned-launcher / running-task separator. -->
     <entry name="showDockSeparator" type="Bool">
       <default>true</default>
