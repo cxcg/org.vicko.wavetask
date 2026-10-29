@@ -20,6 +20,7 @@ import org.kde.plasma.plasmoid
 import org.vicko.wavetask as TaskManager
 
 import "code/LayoutMetrics.js" as LayoutMetrics
+import "code/DockGeometry.js" as DockGeometry
 import "code/TaskTools.js" as TaskTools
 
 PlasmaCore.ToolTipArea {
@@ -116,20 +117,11 @@ PlasmaCore.ToolTipArea {
 
         // Predict positions with base sizes only: referencing live task widths
         // would create a circular dependency (width depends on zoomFactor).
-        let count = tasksRoot.taskRepeater.count;
-        let totalSize = count * _baseSize
-            + Math.max(0, count - 1) * dockRef.spacing
-            + dockRef.separatorSpace;
-
-        let availableSize = tasks.vertical
+        const availableSize = tasksRoot.vertical
             ? tasksRoot.taskList.height : tasksRoot.taskList.width;
-        let centerOffset = (availableSize - totalSize) / 2;
-
-        // Non-pinned tasks start after the reserved separator slot.
-        let iconCenter = centerOffset + index * (_baseSize + dockRef.spacing)
-            + _baseSize / 2
-            + (dockRef.separatorVisible && index >= dockRef.separatorBoundary
-                ? dockRef.separatorSpace : 0);
+        const iconCenter = DockGeometry.baseIconCenter(
+            index, tasksRoot.taskRepeater.count, _baseSize, dockRef.spacing,
+            availableSize, dockRef.separatorBoundary, dockRef.separatorSpace);
 
         // Distancia mouse-icono
         let distance = Math.abs(mousePos - iconCenter);
