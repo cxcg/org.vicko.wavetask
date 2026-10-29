@@ -504,9 +504,11 @@ PlasmaCore.ToolTipArea {
             }
         }
 
-        imagePath: (Plasmoid.configuration.skinName === "Default Plasma") ? "widgets/tasks" : tasks.skinParams.imagetask
-        // Replace only the task-state frame when using the custom indicator.
-        visible: !tasksRoot.iconsOnly || Plasmoid.configuration.runningIndicatorStyle === 0
+        // Keep the FrameSvgItem alive for its drag handlers; only suppress
+        // the stock state artwork when the new marker style is selected.
+        imagePath: tasksRoot.iconsOnly && Plasmoid.configuration.runningIndicatorStyle !== 0
+            ? "" : ((Plasmoid.configuration.skinName === "Default Plasma")
+                    ? "widgets/tasks" : tasks.skinParams.imagetask)
         property bool isHovered: task.highlighted && Plasmoid.configuration.taskHoverEffect
         property string basePrefix: "normal"
         prefix: isHovered ? TaskTools.taskPrefixHovered(basePrefix, Plasmoid.location) : TaskTools.taskPrefix(basePrefix, Plasmoid.location)
@@ -573,13 +575,12 @@ PlasmaCore.ToolTipArea {
         readonly property real baseLength: Plasmoid.configuration.runningIndicatorLength
         readonly property real emphasis: focused ? 1.45 : 1.0
 
-        width: tasksRoot.vertical
-            ? (markerStyle === 1 ? baseThickness : baseLength * emphasis)
-            : (markerStyle === 1 ? baseThickness : baseLength * emphasis)
-        height: tasksRoot.vertical
-            ? (markerStyle === 1 ? baseThickness : baseThickness)
-            : (markerStyle === 1 ? baseThickness : baseThickness)
-        radius: markerStyle === 1 ? baseThickness / 2 : baseThickness / 2
+        // Dot: round; line: square-ended; pill: rounded ends.
+        readonly property real markerLength: markerStyle === 1 ? baseThickness
+            : baseLength * (markerStyle === 3 ? emphasis : 1)
+        width: tasksRoot.vertical ? baseThickness : markerLength
+        height: tasksRoot.vertical ? markerLength : baseThickness
+        radius: markerStyle === 2 ? 1 : baseThickness / 2
         color: model.IsDemandingAttention
             ? Kirigami.Theme.negativeTextColor
             : (focused ? Kirigami.Theme.highlightColor : Kirigami.Theme.textColor)
