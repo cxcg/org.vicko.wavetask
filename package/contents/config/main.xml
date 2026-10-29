@@ -181,6 +181,15 @@
       <label>Whether holding the Meta/Win key should display task index numbers above each icon.</label>
       <default>true</default>
     </entry>
+    <entry name="limitDockZoomToPanel" type="Bool">
+      <default>true</default>
+    </entry>
+    <entry name="dynamicDockBackground" type="Bool">
+      <default>true</default>
+    </entry>
+    <entry name="smoothDockReorder" type="Bool">
+      <default>true</default>
+    </entry>
     <!-- 0 = original skin; 1 = dot; 2 = line; 3 = pill. -->
     <entry name="runningIndicatorStyle" type="Int">
       <default>0</default>
