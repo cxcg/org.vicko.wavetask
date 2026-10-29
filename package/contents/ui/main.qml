@@ -638,10 +638,12 @@ PlasmoidItem {
                     z: -1
 
                     readonly property real padding: Plasmoid.configuration.roundedBackgroundPadding
-                    readonly property real thickness: Plasmoid.configuration.iconSize + padding * 2
-                        + (Plasmoid.configuration.dynamicDockBackground
-                            ? Math.max(0, taskList.motionState.maximumScale - 1)
-                                * Plasmoid.configuration.iconSize * 0.25 : 0)
+                    readonly property real thickness: Math.min(
+                        tasks.vertical ? taskList.width : taskList.height,
+                        Plasmoid.configuration.iconSize + padding * 2
+                            + (Plasmoid.configuration.dynamicDockBackground
+                                ? Math.max(0, taskList.motionState.maximumScale - 1)
+                                    * Plasmoid.configuration.iconSize * 0.25 : 0))
                     readonly property real length: taskList.iconsTotalSize + padding * 2
 
                     width: tasks.vertical ? thickness : length
