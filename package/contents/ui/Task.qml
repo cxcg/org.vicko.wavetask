@@ -114,19 +114,22 @@ PlasmaCore.ToolTipArea {
 
         if (mousePos < 0) return 1.0;
 
-        // Tamaño total SIN zoom
-        let totalSize = tasksRoot.taskRepeater.count * _baseSize;
+        // Predict positions with base sizes only: referencing live task widths
+        // would create a circular dependency (width depends on zoomFactor).
+        let count = tasksRoot.taskRepeater.count;
+        let totalSize = count * _baseSize
+            + Math.max(0, count - 1) * dockRef.spacing
+            + dockRef.separatorSpace;
 
-        // Área disponible según orientación
         let availableSize = tasks.vertical
-        ? tasksRoot.taskList.height
-        : tasksRoot.taskList.width;
-
-        // Offset centrado
+            ? tasksRoot.taskList.height : tasksRoot.taskList.width;
         let centerOffset = (availableSize - totalSize) / 2;
 
-        // Centro del icono actual
-        let iconCenter = centerOffset + (index * _baseSize) + (_baseSize / 2);
+        // Non-pinned tasks start after the reserved separator slot.
+        let iconCenter = centerOffset + index * (_baseSize + dockRef.spacing)
+            + _baseSize / 2
+            + (dockRef.separatorVisible && index >= dockRef.separatorBoundary
+                ? dockRef.separatorSpace : 0);
 
         // Distancia mouse-icono
         let distance = Math.abs(mousePos - iconCenter);
