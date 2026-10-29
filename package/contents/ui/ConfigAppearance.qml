@@ -45,6 +45,9 @@ KCMUtils.SimpleKCM {
     property alias cfg_amplitud: amplitudSlider.value
     property string cfg_skinName: Plasmoid.configuration.skinName
     property alias cfg_showReflection: showReflection.checked
+    property alias cfg_limitDockZoomToPanel: limitDockZoomToPanel.checked
+    property alias cfg_dynamicDockBackground: dynamicDockBackground.checked
+    property alias cfg_smoothDockReorder: smoothDockReorder.checked
     property alias cfg_runningIndicatorStyle: runningIndicatorStyle.currentIndex
     property alias cfg_runningIndicatorLength: runningIndicatorLength.value
     property alias cfg_runningIndicatorThickness: runningIndicatorThickness.value
@@ -206,6 +209,23 @@ KCMUtils.SimpleKCM {
                 color: Kirigami.Theme.disabledTextColor
                 Layout.preferredWidth: Kirigami.Units.gridUnit * 0.2
             }
+        }
+
+        QQC2.CheckBox {
+            id: limitDockZoomToPanel
+            visible: root.iconOnly
+            Kirigami.FormData.label: i18n("Panel-safe motion:")
+            text: i18n("Limit zoom and bounce to the panel drawing area")
+        }
+        QQC2.CheckBox {
+            id: dynamicDockBackground
+            visible: root.iconOnly
+            text: i18n("Expand rounded background smoothly during zoom")
+        }
+        QQC2.CheckBox {
+            id: smoothDockReorder
+            visible: root.iconOnly
+            text: i18n("Preview icon reordering before dropping")
         }
 
         QQC2.CheckBox {
