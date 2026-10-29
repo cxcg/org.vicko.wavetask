@@ -21,6 +21,7 @@ import org.vicko.wavetask as TaskManager
 
 import "code/LayoutMetrics.js" as LayoutMetrics
 import "code/DockGeometry.js" as DockGeometry
+import "code/DockPhysics.js" as DockPhysics
 import "code/TaskTools.js" as TaskTools
 
 PlasmaCore.ToolTipArea {
@@ -107,43 +108,10 @@ PlasmaCore.ToolTipArea {
     // INICIO DEL CÓDIGO ZOOM (OSX EFFECT)
     // ---------------------------------------------------------
 
-    property real zoomFactor: {
-
-        if (!dockRef || _zoom <= 0) return 1.0;
-
-        let mousePos = dockRef.smoothMouse;
-
-        if (mousePos < 0) return 1.0;
-
-        // Predict positions with base sizes only: referencing live task widths
-        // would create a circular dependency (width depends on zoomFactor).
-        const availableSize = tasksRoot.vertical
-            ? tasksRoot.taskList.height : tasksRoot.taskList.width;
-        const iconCenter = DockGeometry.baseIconCenter(
-            index, tasksRoot.taskRepeater.count, _baseSize, dockRef.spacing,
-            availableSize, dockRef.separatorBoundary, dockRef.separatorSpace);
-
-        // Distancia mouse-icono
-        let distance = Math.abs(mousePos - iconCenter);
-
-        // Corte para rendimiento
-        if (distance > _sigma * 3) return 1.0;
-
-        // Entrada/salida animada
-        let dynamicZoom = _zoom * entryProgress;
-
-        // Curva gaussiana tipo macOS
-        return 1.0 + dynamicZoom * Math.exp(-(Math.pow(distance, 2) / (2 * Math.pow(_sigma, 2))));
-    }
-
-    property real entryProgress: (dockRef && dockRef.insideDock) ? 1.0 : 0.0
-
-    Behavior on entryProgress {
-        NumberAnimation {
-            duration: 200
-            easing.type: Easing.OutCubic
-        }
-    }
+    // The controller owns all per-frame zoom and position values.
+    readonly property real zoomFactor: (!inPopup && dockRef && dockRef.motionState.scales[index] !== undefined)
+        ? dockRef.motionState.scales[index] : 1.0
+    readonly property real entryProgress: dockRef ? dockRef.entryProgress : 0
 
     Accessible.name: model.display
     Accessible.description: {
@@ -665,7 +633,9 @@ PlasmaCore.ToolTipArea {
                  * Salto base: 60% del tamaño del icono (con zoom).
                  * Sin tope por la altura del panel: el rebote se anima fuera del layout del applet; en un panel estrecho el compositor aún puede recortar.
                  */
-                property real jumpHeight: Plasmoid.configuration.iconSize * zoomFactor * 0.6
+                property real jumpHeight: DockPhysics.bounceDistance(
+                    tasksRoot.vertical ? tasksRoot.width : tasksRoot.height,
+                    Plasmoid.configuration.iconSize, zoomFactor, 0.6, 2)
 
                 // Animación de ascenso (impulso)
                 NumberAnimation {
