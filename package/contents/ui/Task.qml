@@ -505,6 +505,8 @@ PlasmaCore.ToolTipArea {
         }
 
         imagePath: (Plasmoid.configuration.skinName === "Default Plasma") ? "widgets/tasks" : tasks.skinParams.imagetask
+        // Replace only the task-state frame when using the custom indicator.
+        visible: !tasksRoot.iconsOnly || Plasmoid.configuration.runningIndicatorStyle === 0
         property bool isHovered: task.highlighted && Plasmoid.configuration.taskHoverEffect
         property string basePrefix: "normal"
         prefix: isHovered ? TaskTools.taskPrefixHovered(basePrefix, Plasmoid.location) : TaskTools.taskPrefix(basePrefix, Plasmoid.location)
@@ -552,6 +554,44 @@ PlasmaCore.ToolTipArea {
                 }
             }
         }
+    }
+
+    // Optional macOS-like running-task marker. This is purely visual and does
+    // not participate in task layout, mouse handling or the existing animations.
+    Rectangle {
+        id: runningTaskIndicator
+        visible: tasksRoot.iconsOnly
+            && Plasmoid.configuration.runningIndicatorStyle !== 0
+            && !model.IsLauncher
+            && (model.IsWindow || model.IsGroupParent)
+        z: 5
+        antialiasing: true
+
+        readonly property bool focused: model.IsActive
+        readonly property int markerStyle: Plasmoid.configuration.runningIndicatorStyle
+        readonly property real baseThickness: Plasmoid.configuration.runningIndicatorThickness
+        readonly property real baseLength: Plasmoid.configuration.runningIndicatorLength
+        readonly property real emphasis: focused ? 1.45 : 1.0
+
+        width: tasksRoot.vertical
+            ? (markerStyle === 1 ? baseThickness : baseLength * emphasis)
+            : (markerStyle === 1 ? baseThickness : baseLength * emphasis)
+        height: tasksRoot.vertical
+            ? (markerStyle === 1 ? baseThickness : baseThickness)
+            : (markerStyle === 1 ? baseThickness : baseThickness)
+        radius: markerStyle === 1 ? baseThickness / 2 : baseThickness / 2
+        color: model.IsDemandingAttention
+            ? Kirigami.Theme.negativeTextColor
+            : (focused ? Kirigami.Theme.highlightColor : Kirigami.Theme.textColor)
+        opacity: focused ? 1.0
+                         : (model.IsMinimized ? 0.35 : Plasmoid.configuration.runningIndicatorOpacity)
+
+        x: tasksRoot.vertical
+            ? (tasksRoot.isLeftPanel ? parent.width - width - 2 : 2)
+            : (parent.width - width) / 2
+        y: tasksRoot.vertical
+            ? (parent.height - height) / 2
+            : (tasksRoot.isTopPanel ? parent.height - height - 2 : 2)
     }
 
     Loader {
