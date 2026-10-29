@@ -46,6 +46,20 @@ KCMUtils.SimpleKCM {
     property string cfg_skinName: Plasmoid.configuration.skinName
     property alias cfg_showReflection: showReflection.checked
 
+    // Visual-only separator controls, saved automatically via KConfig.
+    property alias cfg_showDockSeparator: showDockSeparator.checked
+    property alias cfg_separatorGap: separatorGap.value
+    property alias cfg_separatorThickness: separatorThickness.value
+    property alias cfg_separatorLength: separatorLength.value
+    property alias cfg_separatorOpacity: separatorOpacity.value
+
+    // Optional solid-color rounded backdrop, independent of the installed skin.
+    property alias cfg_roundedBackgroundEnabled: roundedBackgroundEnabled.checked
+    property string cfg_roundedBackgroundColor: Plasmoid.configuration.roundedBackgroundColor
+    property alias cfg_roundedBackgroundOpacity: roundedBackgroundOpacity.value
+    property alias cfg_roundedBackgroundRadius: roundedBackgroundRadius.value
+    property alias cfg_roundedBackgroundPadding: roundedBackgroundPadding.value
+
     property alias cfg_cairoPenguinEnabled: cairoPenguinEnabled.checked
 
     Component.onCompleted: {
@@ -338,6 +352,124 @@ KCMUtils.SimpleKCM {
             onActivated: index => {
                 root.cfg_iconSpacing = model[currentIndex]["spacing"];
             }
+        }
+
+        Item {
+            Kirigami.FormData.isSection: true
+            visible: root.iconOnly
+        }
+
+        QQC2.CheckBox {
+            id: showDockSeparator
+            visible: root.iconOnly
+            Kirigami.FormData.label: i18n("Dock separator:")
+            text: i18n("Separate pinned and running applications")
+        }
+
+        QQC2.SpinBox {
+            id: separatorGap
+            visible: root.iconOnly
+            enabled: showDockSeparator.checked
+            Kirigami.FormData.label: i18n("Separator space (px):")
+            from: 8
+            to: 56
+            stepSize: 2
+        }
+
+        QQC2.SpinBox {
+            id: separatorThickness
+            visible: root.iconOnly
+            enabled: showDockSeparator.checked
+            Kirigami.FormData.label: i18n("Line thickness (px):")
+            from: 1
+            to: 6
+        }
+
+        QQC2.SpinBox {
+            id: separatorLength
+            visible: root.iconOnly
+            enabled: showDockSeparator.checked
+            Kirigami.FormData.label: i18n("Line length (px):")
+            from: 12
+            to: 52
+            stepSize: 2
+        }
+
+        RowLayout {
+            visible: root.iconOnly
+            enabled: showDockSeparator.checked
+            Kirigami.FormData.label: i18n("Separator opacity:")
+            QQC2.Slider {
+                id: separatorOpacity
+                Layout.fillWidth: true
+                from: 0.1
+                to: 1
+                stepSize: 0.05
+            }
+            QQC2.Label {
+                text: Math.round(separatorOpacity.value * 100) + "%"
+            }
+        }
+
+        Item {
+            Kirigami.FormData.isSection: true
+            visible: root.iconOnly
+        }
+
+        QQC2.CheckBox {
+            id: roundedBackgroundEnabled
+            visible: root.iconOnly
+            Kirigami.FormData.label: i18n("Dock background:")
+            text: i18n("Use a customizable rounded background")
+        }
+
+        QQC2.TextField {
+            id: roundedBackgroundColor
+            visible: root.iconOnly
+            enabled: roundedBackgroundEnabled.checked
+            Kirigami.FormData.label: i18n("Background color:")
+            text: root.cfg_roundedBackgroundColor
+            placeholderText: "#252A32"
+            validator: RegularExpressionValidator { regularExpression: /^#[0-9a-fA-F]{6}$/ }
+            onEditingFinished: {
+                if (acceptableInput) root.cfg_roundedBackgroundColor = text;
+            }
+        }
+
+        RowLayout {
+            visible: root.iconOnly
+            enabled: roundedBackgroundEnabled.checked
+            Kirigami.FormData.label: i18n("Background opacity:")
+            QQC2.Slider {
+                id: roundedBackgroundOpacity
+                Layout.fillWidth: true
+                from: 0
+                to: 1
+                stepSize: 0.05
+            }
+            QQC2.Label {
+                text: Math.round(roundedBackgroundOpacity.value * 100) + "%"
+            }
+        }
+
+        QQC2.SpinBox {
+            id: roundedBackgroundRadius
+            visible: root.iconOnly
+            enabled: roundedBackgroundEnabled.checked
+            Kirigami.FormData.label: i18n("Corner radius (px):")
+            from: 0
+            to: 48
+            stepSize: 2
+        }
+
+        QQC2.SpinBox {
+            id: roundedBackgroundPadding
+            visible: root.iconOnly
+            enabled: roundedBackgroundEnabled.checked
+            Kirigami.FormData.label: i18n("Background padding (px):")
+            from: 0
+            to: 48
+            stepSize: 2
         }
 
         QQC2.CheckBox {
