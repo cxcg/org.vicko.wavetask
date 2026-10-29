@@ -23,6 +23,7 @@ import org.kde.plasma.workspace.dbus as DBus
 
 import "code/LayoutMetrics.js" as LayoutMetrics
 import "code/DockGeometry.js" as DockGeometry
+import "code/DockPhysics.js" as DockPhysics
 import "code/TaskTools.js" as TaskTools
 
 PlasmoidItem {
@@ -1008,7 +1009,57 @@ PlasmoidItem {
                 id: taskList
 
                 property real smoothMouse: -1
+                property real mouseTarget: -1
                 property bool insideDock: false
+                property real entryProgress: 0
+                property int dragTarget: -1
+                property var motionState: ({ positions: [], scales: [], visualLength: 0,
+                    separatorAxis: 0, maximumScale: 1 })
+                property var motionVelocities: []
+
+                // Single motion tick; delegates consume this state instead of
+                // changing layout widths, preventing feedback/jitter.
+                Timer {
+                    id: dockMotionTimer
+                    running: taskRepeater.count > 0
+                    repeat: true
+                    interval: 16
+                    property double previousTime: 0
+                    onTriggered: {
+                        const now = Date.now();
+                        const dt = previousTime > 0 ? Math.min(0.04, (now - previousTime) / 1000) : 0.016;
+                        previousTime = now;
+                        const target = taskList.insideDock ? taskList.mouseTarget : -1;
+                        taskList.smoothMouse = target < 0 ? taskList.smoothMouse
+                            : DockPhysics.smooth(taskList.smoothMouse, target, dt, 0.032);
+                        taskList.entryProgress = DockPhysics.smooth(taskList.entryProgress,
+                            taskList.insideDock ? 1 : 0, dt, taskList.insideDock ? 0.075 : 0.12);
+                        const cross = tasks.vertical ? taskList.width : taskList.height;
+                        const limit = Plasmoid.configuration.limitDockZoomToPanel
+                            ? DockPhysics.safeScale(taskList.maxZoom, cross, taskList._baseSize, 4)
+                            : taskList.maxZoom;
+                        const targetLayout = DockPhysics.layout(taskRepeater.count, taskList._baseSize,
+                            taskList.spacing, taskList.separatorBoundary, taskList.separatorSpace,
+                            tasks.vertical ? taskList.height : taskList.width,
+                            taskList.insideDock ? taskList.smoothMouse : -1,
+                            taskList.entryProgress, taskList._zoom, taskList._sigma, limit,
+                            tasks.dragSource ? tasks.dragSource.index : -1, taskList.dragTarget);
+                        const old = taskList.motionState;
+                        const velocities = taskList.motionVelocities.slice();
+                        const positions = targetLayout.positions.slice();
+                        for (let i = 0; i < positions.length; ++i) {
+                            if (old.positions && Number.isFinite(old.positions[i])) {
+                                const next = DockPhysics.spring(old.positions[i], velocities[i] || 0,
+                                    positions[i], dt, 320, 35);
+                                positions[i] = next[0];
+                                velocities[i] = next[1];
+                            } else velocities[i] = 0;
+                        }
+                        taskList.motionVelocities = velocities;
+                        targetLayout.positions = positions;
+                        taskList.motionState = targetLayout;
+                    }
+                }
                 property alias animating: taskList.animating
                 readonly property real spacing: Kirigami.Units.smallSpacing
                 readonly property real _baseSize: Plasmoid.configuration.iconSize
@@ -1028,9 +1079,10 @@ PlasmoidItem {
                     Plasmoid.configuration.showDockSeparator)
                 readonly property real separatorSpace: separatorVisible
                     ? Plasmoid.configuration.separatorGap : 0
-                readonly property real separatorAxis: DockGeometry.separatorPosition(
-                    taskRepeater, separatorBoundary, tasks.vertical, _baseSize,
-                    spacing, separatorSpace, centerOffset)
+                readonly property real separatorAxis: motionState.separatorAxis > 0
+                    ? motionState.separatorAxis : DockGeometry.separatorPosition(
+                        taskRepeater, separatorBoundary, tasks.vertical, _baseSize,
+                        spacing, separatorSpace, centerOffset)
 
                 readonly property real baseContentSize: DockGeometry.baseLength(
                     taskRepeater.count, _baseSize, spacing, separatorSpace)
@@ -1041,8 +1093,8 @@ PlasmoidItem {
                 property real contentSize: DockGeometry.contentLength(
                     baseContentSize, _zoom, _sigma, spacing)
 
-               readonly property real iconsTotalSize: DockGeometry.occupiedLength(
-                   taskRepeater, tasks.vertical, _baseSize, spacing, separatorSpace)
+               readonly property real iconsTotalSize: motionState.visualLength > 0
+                   ? motionState.visualLength : baseContentSize
 
                readonly property real centerOffset: {
                    let availableSize = tasks.vertical
@@ -1089,15 +1141,7 @@ PlasmoidItem {
                     id: dockHoverHandler
 
                     onPointChanged: {
-                        let mousePos = tasks.vertical ? point.position.y : point.position.x
-
-                        if (taskList.smoothMouse < 0) {
-                            taskList.smoothMouse = mousePos
-                        } else {
-                            taskList.smoothMouse +=
-                            (mousePos - taskList.smoothMouse) * 0.3
-                        }
-
+                        taskList.mouseTarget = tasks.vertical ? point.position.y : point.position.x
                         taskList.insideDock = true
                     }
 
@@ -1150,18 +1194,15 @@ PlasmoidItem {
                             return 0;
                         }
 
-                        property real itemPos: DockGeometry.itemPosition(
-                            taskRepeater, index, tasks.vertical, taskList._baseSize,
-                            taskList.spacing, taskList.centerOffset,
-                            taskList.separatorBoundary, taskList.separatorSpace)
+                        property real itemPos: Number.isFinite(taskList.motionState.positions[index])
+                            ? taskList.motionState.positions[index]
+                            : DockGeometry.itemPosition(taskRepeater, index,
+                                tasks.vertical, taskList._baseSize, taskList.spacing,
+                                taskList.centerOffset, taskList.separatorBoundary,
+                                taskList.separatorSpace)
 
-                        width: tasks.vertical
-                        ? Plasmoid.configuration.iconSize
-                        : (Plasmoid.configuration.iconSize * zoomFactor)
-
-                        height: tasks.vertical
-                        ? (Plasmoid.configuration.iconSize * zoomFactor)
-                        : undefined
+                        width: Plasmoid.configuration.iconSize
+                        height: tasks.vertical ? Plasmoid.configuration.iconSize : undefined
                     }
                 }
             }
