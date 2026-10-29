@@ -81,14 +81,15 @@ DropArea {
 
             const insertAt = above.index;
 
-            if (tasks.dragSource !== above && tasks.dragSource.index !== insertAt) {
+            if (Plasmoid.configuration.smoothDockReorder && !tasks.groupDialog && tasks.iconsOnly) {
+                tasks.taskList.dragTarget = insertAt;
+            } else if (tasks.dragSource !== above && tasks.dragSource.index !== insertAt) {
                 if (tasks.groupDialog) {
                     tasksModel.move(tasks.dragSource.index, insertAt,
                         tasksModel.makeModelIndex(tasks.groupDialog.visualParent.index));
                 } else {
                     tasksModel.move(tasks.dragSource.index, insertAt);
                 }
-
                 ignoredItem = above;
                 ignoreItemTimer.restart();
             }
