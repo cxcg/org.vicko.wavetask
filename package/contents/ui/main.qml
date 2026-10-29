@@ -249,11 +249,20 @@ PlasmoidItem {
 //END TODO
 
     property Item dragSource
+    property int dragSourcePreviousIndex: -1
 
     signal requestLayout
 
     onDragSourceChanged: {
-        if (dragSource === null) {
+        if (dragSource) {
+            dragSourcePreviousIndex = dragSource.index;
+        } else {
+            if (Plasmoid.configuration.smoothDockReorder && taskList.dragTarget >= 0
+                && dragSourcePreviousIndex >= 0 && tasksModel.sortMode === TaskManager.TasksModel.SortManual) {
+                tasksModel.move(dragSourcePreviousIndex, taskList.dragTarget);
+            }
+            taskList.dragTarget = -1;
+            dragSourcePreviousIndex = -1;
             tasksModel.syncLaunchers();
         }
     }
@@ -630,6 +639,9 @@ PlasmoidItem {
 
                     readonly property real padding: Plasmoid.configuration.roundedBackgroundPadding
                     readonly property real thickness: Plasmoid.configuration.iconSize + padding * 2
+                        + (Plasmoid.configuration.dynamicDockBackground
+                            ? Math.max(0, taskList.motionState.maximumScale - 1)
+                                * Plasmoid.configuration.iconSize * 0.25 : 0)
                     readonly property real length: taskList.iconsTotalSize + padding * 2
 
                     width: tasks.vertical ? thickness : length
