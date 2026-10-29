@@ -22,6 +22,7 @@ import org.vicko.wavetask as TaskManagerApplet
 import org.kde.plasma.workspace.dbus as DBus
 
 import "code/LayoutMetrics.js" as LayoutMetrics
+import "code/DockGeometry.js" as DockGeometry
 import "code/TaskTools.js" as TaskTools
 
 PlasmoidItem {
@@ -662,10 +663,7 @@ PlasmoidItem {
                 readonly property real verticalMargins:
                 shadowItem.margins.top + shadowItem.margins.bottom
 
-                readonly property real baseIconsSize:
-                taskRepeater.count * Plasmoid.configuration.iconSize +
-                Math.max(0, taskRepeater.count - 1) * taskList.spacing +
-                taskList.separatorSpace
+                readonly property real baseIconsSize: taskList.baseContentSize
 
                 readonly property real verticalOffsetX: -Kirigami.Units.smallSpacing * 0.5
 
@@ -820,8 +818,10 @@ PlasmoidItem {
                 visible: source.toString() !== ""
                 opacity: 1.0
                 readonly property real spacing: Kirigami.Units.largeSpacing
-                readonly property real topMarginSkin: tasks.containmentItem.height - 76
-                readonly property real leftMarginSkin: tasks.containmentItem.width - 76
+                readonly property real topMarginSkin: DockGeometry.skinOverflow(
+                    tasks.containmentItem ? tasks.containmentItem.height : tasks.height, taskList.height)
+                readonly property real leftMarginSkin: DockGeometry.skinOverflow(
+                    tasks.containmentItem ? tasks.containmentItem.width : tasks.width, taskList.width)
 
                 property real rightPanelOffset:(tasks.vertical && !tasks.isLeftPanel) ? ((tasks.containmentItem.width / 2) + Kirigami.Units.smallSpacing * 3) : 0
 
@@ -1021,56 +1021,35 @@ PlasmoidItem {
 
                 // The task model already sorts launchers before unrelated windows.
                 // Use its logical launcher count to preserve pinned running apps.
-                readonly property int separatorBoundary: Math.max(0,
-                    Math.min(tasksModel.logicalLauncherCount, taskRepeater.count))
-                readonly property bool separatorVisible: Plasmoid.configuration.showDockSeparator
-                    && separatorBoundary > 0 && separatorBoundary < taskRepeater.count
+                readonly property int separatorBoundary: DockGeometry.separatorBoundary(
+                    taskRepeater.count, tasksModel.logicalLauncherCount)
+                readonly property bool separatorVisible: DockGeometry.separatorEnabled(
+                    taskRepeater.count, separatorBoundary,
+                    Plasmoid.configuration.showDockSeparator)
                 readonly property real separatorSpace: separatorVisible
                     ? Plasmoid.configuration.separatorGap : 0
-                readonly property real separatorAxis: {
-                    if (!separatorVisible) return 0;
-                    const lastPinned = taskRepeater.itemAt(separatorBoundary - 1);
-                    if (!lastPinned) return 0;
-                    return lastPinned.itemPos
-                        + (tasks.vertical ? lastPinned.height : lastPinned.width)
-                        + spacing + separatorSpace / 2;
-                }
+                readonly property real separatorAxis: DockGeometry.separatorPosition(
+                    taskRepeater, separatorBoundary, tasks.vertical, _baseSize,
+                    spacing, separatorSpace, centerOffset)
 
-                readonly property real baseContentSize: taskRepeater.count * Plasmoid.configuration.iconSize
-                    + Math.max(0, taskRepeater.count - 1) * spacing + separatorSpace
+                readonly property real baseContentSize: DockGeometry.baseLength(
+                    taskRepeater.count, _baseSize, spacing, separatorSpace)
 
                 // Integral gaussiana aproximada
                 readonly property real zoomExtraSize: _zoom * _sigma * Math.sqrt(2 * Math.PI)
 
-                property real contentSize: Math.ceil(baseContentSize + zoomExtraSize + spacing * 4)
+                property real contentSize: DockGeometry.contentLength(
+                    baseContentSize, _zoom, _sigma, spacing)
 
-               readonly property real iconsTotalSize: {
-                   let total = 0;
-
-                   for (let i = 0; i < taskRepeater.count; ++i) {
-                       let item = taskRepeater.itemAt(i);
-
-                       if (item) {
-
-                           total += tasks.vertical
-                           ? item.height
-                           : item.width;
-
-                           if (i > 0)
-                               total += spacing;
-                       }
-                   }
-
-                   // Include exactly one reserved separator slot in centering.
-                   return total + separatorSpace;
-               }
+               readonly property real iconsTotalSize: DockGeometry.occupiedLength(
+                   taskRepeater, tasks.vertical, _baseSize, spacing, separatorSpace)
 
                readonly property real centerOffset: {
                    let availableSize = tasks.vertical
                    ? height
                    : width;
 
-                   return (availableSize - iconsTotalSize) / 2;
+                   return DockGeometry.centerOffset(availableSize, iconsTotalSize);
                }
 
                 Layout.maximumWidth: contentSize
@@ -1078,11 +1057,8 @@ PlasmoidItem {
 
                 width: {
                     if (tasks.vertical) {
-                        return Math.ceil(
-                            Plasmoid.configuration.iconSize *
-                            taskList.maxZoom +
-                            spacing * 4
-                        );
+                        return DockGeometry.crossAxisLength(
+                            _baseSize, maxZoom, spacing);
                     }
 
                     return contentSize;
@@ -1174,26 +1150,10 @@ PlasmoidItem {
                             return 0;
                         }
 
-                        property real itemPos: {
-                            let pos = taskList.centerOffset;
-
-                            for (let i = 0; i < index; ++i) {
-                                let previousItem = taskRepeater.itemAt(i);
-
-                                let size = previousItem
-                                ? (tasks.vertical
-                                ? previousItem.height
-                                : previousItem.width)
-                                : Plasmoid.configuration.iconSize;
-
-                                pos += size + taskList.spacing;
-                            }
-
-                            if (taskList.separatorVisible && index >= taskList.separatorBoundary) {
-                                pos += taskList.separatorSpace;
-                            }
-                            return pos;
-                        }
+                        property real itemPos: DockGeometry.itemPosition(
+                            taskRepeater, index, tasks.vertical, taskList._baseSize,
+                            taskList.spacing, taskList.centerOffset,
+                            taskList.separatorBoundary, taskList.separatorSpace)
 
                         width: tasks.vertical
                         ? Plasmoid.configuration.iconSize
