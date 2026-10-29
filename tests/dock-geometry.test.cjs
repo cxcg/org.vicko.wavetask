@@ -48,3 +48,10 @@ assert.equal(g.crossAxisLength(42, 1.5, 6), 87);
 assert.equal(g.skinOverflow(86, 70), 16);
 assert.equal(g.skinOverflow(40, 70), 0);
 console.log("dock-geometry: all assertions passed");
+
+assert.equal(g.indicatorX(true, true, 86, 4, 2), 2);   // left dock
+assert.equal(g.indicatorX(true, false, 86, 4, 2), 80); // right dock
+assert.equal(g.indicatorX(false, false, 86, 4, 2), 41);
+assert.equal(g.indicatorY(false, true, 86, 4, 2), 2);  // top dock
+assert.equal(g.indicatorY(false, false, 86, 4, 2), 80);// bottom dock
+assert.equal(g.indicatorY(true, false, 86, 4, 2), 41);
