@@ -587,12 +587,10 @@ PlasmaCore.ToolTipArea {
         opacity: focused ? 1.0
                          : (model.IsMinimized ? 0.35 : Plasmoid.configuration.runningIndicatorOpacity)
 
-        x: tasksRoot.vertical
-            ? (tasksRoot.isLeftPanel ? parent.width - width - 2 : 2)
-            : (parent.width - width) / 2
-        y: tasksRoot.vertical
-            ? (parent.height - height) / 2
-            : (tasksRoot.isTopPanel ? parent.height - height - 2 : 2)
+        x: DockGeometry.indicatorX(tasksRoot.vertical, tasksRoot.isLeftPanel,
+            parent.width, width, 2)
+        y: DockGeometry.indicatorY(tasksRoot.vertical, tasksRoot.isTopPanel,
+            parent.height, height, 2)
     }
 
     Loader {
