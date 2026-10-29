@@ -1,0 +1,30 @@
+// Standalone tests for the panel-safe frame-based dock motion model.
+const fs = require("node:fs");
+const vm = require("node:vm");
+const assert = require("node:assert/strict");
+const sandbox = {};
+vm.createContext(sandbox);
+vm.runInContext(fs.readFileSync("package/contents/ui/code/DockPhysics.js", "utf8"), sandbox);
+const d = sandbox;
+function approx(a,b,eps=0.001){ assert.ok(Math.abs(a-b)<eps, `${a} differs from ${b}`); }
+assert.equal(d.smooth(4,4,0.016,0.03),4);
+assert.ok(d.smooth(0,1,0.016,0.03)>0);
+assert.ok(d.smooth(0,1,0.016,0.03)<1);
+assert.equal(d.smooth(NaN,25,0.016,0.03),25);
+assert.ok(d.spring(0,0,10,0.016,320,35)[0]>0);
+assert.deepEqual(Array.from(d.orderForPreview(4,0,2)),[1,2,0,3]);
+assert.deepEqual(Array.from(d.orderForPreview(3,-1,2)),[0,1,2]);
+assert.equal(d.safeScale(2,42,42,4),1);
+assert.equal(d.safeScale(2,90,42,4),2);
+assert.equal(d.bounceDistance(80,42,1.5,0.6,2),15);
+const a=d.layout(5,42,6,3,22,600,285,1,0.9,76,2, -1,-1);
+assert.equal(a.scales.length,5);
+assert.equal(a.positions.length,5);
+assert.ok(a.scales.every(x=>x>=1&&x<=1.9));
+assert.ok(a.separatorAxis>0);
+assert.ok(a.positions.every(Number.isFinite));
+const b=d.layout(5,42,6,3,22,600,-1,0,0.9,76,1.1,-1,-1);
+assert.ok(b.scales.every(x=>x===1));
+const c=d.layout(5,42,6,3,22,600,-1,0,0.9,76,2,0,3);
+assert.equal(c.order[3],0);
+console.log("dock physics tests passed");
